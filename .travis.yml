@@ -2,11 +2,14 @@ os: windows
 
 language: shell
 
+install:
+  - PowerShell -Command 'Set-ExecutionPolicy -ExecutionPolicy RemoteSigned'
+
 before_install:
 - echo -e "machine github.com\n  login $GITHUB_TOKEN" > ~/.netrc
 
 script:
-- echo %TRAVIS_BUILD_DIR%
+- echo $TRAVIS_BUILD_DIR
 
 # deploy:
 #   provider: pages
