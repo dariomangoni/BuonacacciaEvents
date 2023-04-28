@@ -20,19 +20,17 @@ function GetColorCode {
 Add-Type -Assembly System.Windows.Forms
 Remove-Variable * -ErrorAction SilentlyContinue
 $ProgressPreference = "SilentlyContinue"
-Set-Location -Path "D:\GoogleDrive\Scout\RisorseVarie\buonacaccia_eventi\"
 $curdir = Get-Location
 Write-Output "Current working directory: $curdir"
 Write-Output "Retrieving web page"
 $source = Invoke-WebRequest "https://buonacaccia.net/Events.aspx?RID=A&CID=25" -OutFile ".\buonacaccia_comp.html"
 $camps_path = ".\buonacaccia_comp.json"
-$trigger_popup_newstatus = $true
 
 
 $content = Get-Content -Path .\buonacaccia_comp.html -Encoding UTF8 -Raw
-$template = Get-Content -Path "$PSScriptRoot\output_template_comp.html" -Encoding UTF8 -Raw
+$template = Get-Content -Path .\output_template_comp.html -Encoding UTF8 -Raw
 # $content = [System.IO.File]::ReadAllText(".\buonacaccia_comp.html")
-# $template = [System.IO.File]::ReadAllText("$PSScriptRoot\output_template_comp.html")
+# $template = [System.IO.File]::ReadAllText("output_template_comp.html")
 
 $template = $template -split 'PLACEHOLDER'
 
@@ -124,7 +122,7 @@ for ($camp_sel = 0; $camp_sel -lt $camps.count; $camp_sel++)
                 }
                 if (($camps[$camp_sel].status -like "libero" -and $camps_old[$camp_old_sel].status -like "coda") -or ((-not $camps[$camp_sel].status -like "pieno") -and $camps_old[$camp_old_sel].status -like "pieno")){
                     $new_status = $true
-                    $camps_newstatus_str += $camps[$camp_sel].spec + " (" + $camps[$camp_sel].province + "): " + $camps_old[$camp_old_sel].status.ToUpper() + "-->" + $camps[$camp_sel].status.ToUpper() + "`n"
+                    $camps_newstatus_str += '<p><a href="' + $camps[$camp_sel].link + ' target="_blank">' + $camps[$camp_sel].spec + ' (' + $camps[$camp_sel].province + ')</a>: ' + $camps_old[$camp_old_sel].status.ToUpper() + "-->" + $camps[$camp_sel].status.ToUpper() + '</p>' + "`n"
                 }
                 break
             }
@@ -134,7 +132,7 @@ for ($camp_sel = 0; $camp_sel -lt $camps.count; $camp_sel++)
     if (-not $camp_old_found){
         $new_availability = $true
         $new_status = $true
-        $camps_newstatus_str += $camps[$camp_sel].spec + " (" + $camps[$camp_sel].province + "): " + "NUOVO`n"
+        $camps_newstatus_str += '<p><a href="' + $camps[$camp_sel].link + ' target="_blank">' + $camps[$camp_sel].spec + ' (' + $camps[$camp_sel].province + ')</a>: NUOVO</p>' + "`n"
     }
 
     if ($new_availability){
@@ -170,11 +168,11 @@ $camps_json | Out-File -FilePath .\buonacaccia_comp.json -Encoding UTF8
 
 Write-Output "Writing HTML result file: .\buonacaccia_comp_mod.html"
 $content_output | Out-File -FilePath .\buonacaccia_comp_mod.html -Encoding UTF8
+Remove-Item -Path ".\buonacaccia_comp.html"
 
-if ($trigger_popup_newstatus -and $old_json_available -and $camps_newstatus_str -ne ""){
-    $Result = [System.Windows.Forms.MessageBox]::Show(
-        "Nuova disponibilità di campetti di competenza per:`n" + $camps_newstatus_str,
-        "Campetti Competenza - Nuova disponibilità",
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        [System.Windows.Forms.MessageBoxIcon]::Information)
+
+if ($camps_newstatus_str -ne ""){
+    Write-Output "Writing HTML new events file: .\nuovi_eventi.html"
+    $camps_newstatus_str = "<div>`n" + $camps_newstatus_str + "</div>`n"
+    $camps_newstatus_str | Out-File -FilePath .\nuovi_eventi.html -Append -Encoding UTF8
 }

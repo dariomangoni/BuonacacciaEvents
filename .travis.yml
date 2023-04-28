@@ -10,11 +10,16 @@ before_install:
 
 script:
 - echo $TRAVIS_BUILD_DIR
+- PowerShell -File buonacaccia_comp.ps1
+- PowerShell -File buonacaccia_spec.ps1
+- PowerShell -File create_index.ps1
 
-# deploy:
-#   provider: pages
-#   skip_cleanup: true
-#   github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
-#   keep_history: false
-#   on:
-#     branch: main
+deploy:
+  provider: pages
+  project_name: "BuonacacciaEvents"
+  email: dariomangoni@gmail.com
+  skip_cleanup: true
+  github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
+  keep_history: false
+  on:
+    branch: main
