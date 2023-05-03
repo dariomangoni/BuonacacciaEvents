@@ -10,7 +10,7 @@ build:
   verbosity: minimal
 
 install:
-  - pwsh: Set-ExecutionPolicy AllSigned
+  - pwsh: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
 
 
 build_script:
