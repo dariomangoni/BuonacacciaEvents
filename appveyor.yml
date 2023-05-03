@@ -29,11 +29,19 @@ artifacts:
     name: BuonacacciaSpec
 
 notifications:
-
-  # Email
   - provider: Email
     to:
       - dariomangoni@gmail.com
-    subject: 'Buonacaccia Eventi'                  # optional
-    message: "{{message}}, {{commitId}}, ..."    # optional
+    subject: 'Buonacaccia Competenza - Nuovi Eventi'
+    message: "Nuovi eventi di Competenza!"
+    on:
+      NEW_COMP: true
+
+  - provider: Email
+    to:
+      - dariomangoni@gmail.com
+    subject: 'Buonacaccia Specialità - Nuovi Eventi'
+    message: "Nuovi eventi di Specialità!"
+    on:
+      NEW_COMP: true
     
