@@ -1,0 +1,19 @@
+version: 1.0.{build}
+image: Visual Studio 2022
+
+
+cache:
+- buonacaccia_comp.json
+- buonacaccia_spec.json
+
+build:
+  verbosity: minimal
+
+install:
+  - pwsh: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+
+
+build_script:
+- pwsh: buonacaccia_comp.ps1
+- pwsh: buonacaccia_spec.ps1
+- pwsh: create_index.ps1
