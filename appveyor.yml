@@ -14,10 +14,11 @@ install:
 
 
 build_script:
-- pwsh: . .\buonacaccia_events.ps1
-- pwsh: $env:NEW_COMP=GetBuonacacciaCompUpdates
-- pwsh: $env:NEW_SPEC=GetBuonacacciaSpecUpdates
-- pwsh: .\create_index.ps1
+- pwsh: >-
+    . .\buonacaccia_events.ps1
+    $env:NEW_COMP=GetBuonacacciaCompUpdates
+    $env:NEW_SPEC=GetBuonacacciaSpecUpdates
+    .\create_index.ps1
 
 
 
