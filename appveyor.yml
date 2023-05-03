@@ -14,9 +14,8 @@ install:
 
 
 build_script:
-- pwsh: . ./buonacaccia_comp.ps1
+- pwsh: . ./buonacaccia_events.ps1
 - pwsh: $env:NEW_COMP=GetBuonacacciaCompUpdates
-- pwsh: . ./buonacaccia_spec.ps1
 - pwsh: $env:NEW_SPEC=GetBuonacacciaSpecUpdates
 - pwsh: ./create_index.ps1
 
