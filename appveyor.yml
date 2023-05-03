@@ -10,10 +10,29 @@ build:
   verbosity: minimal
 
 install:
-  - pwsh: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+  - pwsh: Set-ExecutionPolicy AllSigned
 
 
 build_script:
 - pwsh: ./buonacaccia_comp.ps1
 - pwsh: ./buonacaccia_spec.ps1
 - pwsh: ./create_index.ps1
+- pwsh: $env:NEW_COMP=GetBuonacacciaCompUpdates
+- pwsh: $env:NEW_SPEC=GetBuonacacciaSpecUpdates
+
+
+artifacts:
+  - path: buonacaccia_comp_mod.html
+    name: BuonacacciaComp
+  - path: buonacaccia_spec_mod.html
+    name: BuonacacciaSpec
+
+notifications:
+
+  # Email
+  - provider: Email
+    to:
+      - dariomangoni@gmail.com
+    subject: 'Buonacaccia Eventi'                  # optional
+    message: "{{message}}, {{commitId}}, ..."    # optional
+    
