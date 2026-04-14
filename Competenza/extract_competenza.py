@@ -1,0 +1,302 @@
+from openpyxl import Workbook, load_workbook
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import re
+import json
+from datetime import datetime
+from openpyxl.styles import Font, Alignment
+from openpyxl.formatting.rule import CellIsRule
+from openpyxl.styles import PatternFill
+from pathlib import Path
+import shutil
+from openpyxl.utils.datetime import to_excel
+from openpyxl.worksheet.filters import (
+    FilterColumn,
+    CustomFilters,
+    CustomFilter,
+)
+
+
+worsheet_title = "Competenza"
+file_excel = "competenza.xlsx"
+json_path = "competenza.json"
+url = "https://buonacaccia.net/Events.aspx?RID=&CID=2010104&All=1"
+enable_details_page_scraping = True
+
+# only for Excel filtering; comment to not filter
+# regioni_filtro = ["Lombardia", "Piemonte", "Veneto", "EmiRo", "Toscana", "Liguria"]
+stato_filtro = ["LIBERO", "CODA"]
+
+def clean_data(data_raw):
+    try:
+        return datetime.strptime(data_raw.strip(), "%d/%m/%Y")
+    except:
+        return None 
+    
+
+# 1. Scaricamento della pagina
+baseUrl = "https://buonacaccia.net"
+headers = {'User-Agent': 'Mozilla/5.0'} # Simula un browser per evitare blocchi
+response = requests.get(url, headers=headers)
+soup = BeautifulSoup(response.text, 'html.parser')
+
+# 1. Trova la tabella principale
+table = soup.find("table", {"id": "MainContent_EventsGridView"})
+
+# 2. Trova il tbody (BS lo trova anche se nel codice sorgente è implicito)
+tbody = table.find("tbody", recursive=False)
+
+# 3. Se esiste il tbody, cerca i tr lì dentro, altrimenti cercali nella table
+target = tbody if tbody else table
+rows = target.find_all("tr", recursive=False)
+
+data_list = []
+row_count = 0
+for row in rows:
+    cols = row.find_all("td", recursive=False)
+    if len(cols) < 5: continue # Salta righe vuote o spurie
+
+    row_count += 1
+
+    # --- Estrazione Titolo e Link ---
+    link_tag = cols[2].find("a")
+    titolo_testo = link_tag.text.strip()
+    link_url = link_tag.get("href")
+    link_url = baseUrl + "/" + link_url
+
+    if enable_details_page_scraping:
+        print(f"Scraping dettagli per evento [{row_count} / {len(rows) - 1}]: {titolo_testo}")
+        # Estrazione dettagli dalla pagina dell'evento
+        detail_response = requests.get(link_url, headers=headers)
+        detail_soup = BeautifulSoup(detail_response.text, 'html.parser')
+        
+        apertura_iscr_tag = detail_soup.find("span", {"id": "MainContent_EventFormView_lbSubsFrom"})
+        apertura_iscr = clean_data(apertura_iscr_tag.text.strip())
+
+        chiusura_iscr_tag = detail_soup.find("span", {"id": "MainContent_EventFormView_lbSubsTo"})
+        chiusura_iscr = clean_data(chiusura_iscr_tag.text.strip())
+    
+    regione = re.search(r"Competenza - ([^|]+)", titolo_testo).group(1).strip()
+    partenza = clean_data(cols[4].text)
+    rientro = clean_data(cols[5].text)
+
+    quota_raw = cols[6].text.strip()
+    try:
+        quota_clean = quota_raw.replace('€', '').replace(',', '.').strip()
+        quota = float(quota_clean)
+    except ValueError:
+        quota = 0.0  # Gestione errore se il campo è vuoto o contiene testo
+
+    # --- Estrazione Località (Comune e Provincia) ---
+    # Assume pattern "Nome Comune (PR)"
+    localita_raw = cols[7].text.strip()
+    match_loc = re.search(r"(.+)\s\((.+)\)", localita_raw)
+    comune = match_loc.group(1).strip() if match_loc else localita_raw
+    provincia = match_loc.group(2).strip() if match_loc else ""
+
+    # --- Estrazione Iscritti (Pattern "10 / 20") ---
+    iscritti_raw = cols[8].text.strip()
+    match_iscr = re.search(r"(\d+)\s*/\s*(\d+)", iscritti_raw)
+    iscritti_val = int(match_iscr.group(1)) if match_iscr else 0
+    iscritti_max = int(match_iscr.group(2)) if match_iscr else 0
+
+    # Creazione del record
+    record = {
+        "Titolo": titolo_testo,
+        "Link": link_url,
+        "Regione": regione,
+        "Partenza": partenza,
+        "Rientro": rientro,
+        "Quota": quota,
+        "Comune": comune,
+        "Provincia": provincia,
+        "Iscritti": iscritti_val,
+        "Iscritti_MAX": iscritti_max
+    }
+
+    if enable_details_page_scraping:
+        record["Apertura_Iscrizioni"] = apertura_iscr
+        record["Chiusura_Iscrizioni"] = chiusura_iscr
+
+    data_list.append(record)
+
+# --- CREAZIONE DATAFRAME ---
+df = pd.DataFrame(data_list)
+
+# --- EXPORT JSON (Prima di modificare i titoli per Excel) ---
+output_json = {
+    "ultimo_aggiornamento": datetime.now().isoformat(),
+    "eventi": df.to_dict(orient="records")
+}
+def json_serial(obj):
+    if isinstance(obj, (datetime)): return obj.strftime('%Y-%m-%d')
+    raise TypeError ("Type %s not serializable" % type(obj))
+
+
+with open(json_path, "w", encoding="utf-8") as f:
+    json.dump(output_json, f, indent=4, default=json_serial, ensure_ascii=False)
+
+# --- PREPARAZIONE EXCEL ---
+
+# 1. Inizializza il Workbook
+wb = Workbook()
+ws = wb.active
+ws.title = worsheet_title
+
+# 2. Definisci l'intestazione (senza la colonna "Link" che integreremo nel Titolo)
+headers = ["Titolo", "Regione",  "Partenza", "Rientro", "Quota", "Comune", "Provincia", "Iscritti", "Iscritti_MAX", "Stato", "Nuovo"]
+if enable_details_page_scraping:
+    headers.extend(["Apertura Iscr", "Chiusura Iscr"])
+ws.append(headers)
+
+oggi = datetime.now()
+    
+file_excel_old_exists = False
+path_excel = Path(file_excel)
+path_excel_old = path_excel.with_name(path_excel.stem + "_old" + path_excel.suffix)
+if path_excel.is_file():
+    file_excel_old_exists = True
+    shutil.copy(path_excel, path_excel_old) # Backup del file esistente
+    wb_old = load_workbook(path_excel_old, read_only=True)
+    ws_old = wb_old[worsheet_title]
+
+
+def exists_in_worksheet(ws, value):
+    found = False
+    for row in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
+        if row[0] == value:
+            found = True
+            break
+            
+    return found
+
+# 3. Itera sulla lista di record e scrivi le righe
+for i, record in enumerate(data_list, start=2): # Start=2 perché la riga 1 è l'header
+    
+    cell_titolo = ws.cell(row=i, column=1, value=record["Titolo"])
+    cell_titolo.font = Font(color="0000FF", underline="single")
+    cell_titolo.hyperlink = record["Link"]
+        
+
+    cell_regione = ws.cell(row=i, column=2, value=record["Regione"])
+    if 'regioni_filtro' in globals() and record["Regione"] not in regioni_filtro:
+        ws.row_dimensions[i].hidden = True
+
+    cell_partenza = ws.cell(row=i, column=3, value=record["Partenza"])
+    cell_partenza.number_format = 'DD/MM/YYYY'
+    cell_partenza.alignment = Alignment(horizontal='center', vertical='center')
+
+    cell_rientro = ws.cell(row=i, column=4, value=record["Rientro"])
+    cell_rientro.number_format = 'DD/MM/YYYY'
+    cell_rientro.alignment = Alignment(horizontal='center', vertical='center')
+
+
+    cell_quota = ws.cell(row=i, column=5, value=record["Quota"])
+    cell_quota.number_format = '#,##0.00 €'
+    cell_quota.alignment = Alignment(horizontal='center', vertical='center')
+
+    cell_comune = ws.cell(row=i, column=6, value=record["Comune"])
+    cell_comune.alignment = Alignment(horizontal='left', vertical='center')
+    cell_provincia = ws.cell(row=i, column=7, value=record["Provincia"])
+    cell_provincia.alignment = Alignment(horizontal='center', vertical='center')
+    cell_iscritti = ws.cell(row=i, column=8, value=record["Iscritti"])
+    cell_iscritti.alignment = Alignment(horizontal='center', vertical='center')
+    cell_iscritti_max = ws.cell(row=i, column=9, value=record["Iscritti_MAX"])
+    cell_iscritti_max.alignment = Alignment(horizontal='center', vertical='center')
+
+    cell_stato = ws.cell(row=i, column=10, value=f'=IF(H{i}<I{i},"LIBERO",IF(H{i}<=(I{i}+5),"CODA","PIENO"))')
+    cell_stato.alignment = Alignment(horizontal='center', vertical='center')
+
+    if 'stato_filtro' in globals():
+        if record["Iscritti"] < record["Iscritti_MAX"] and "LIBERO" not in stato_filtro:
+            ws.row_dimensions[i].hidden = True
+        elif record["Iscritti"] <= record["Iscritti_MAX"]+5 and "CODA" not in stato_filtro:
+            ws.row_dimensions[i].hidden = True
+        elif record["Iscritti"] > record["Iscritti_MAX"]+5 and "PIENO" not in stato_filtro:
+            ws.row_dimensions[i].hidden = True
+
+    if file_excel_old_exists and exists_in_worksheet(ws_old, record["Titolo"]):
+        cell_nuovo = ws.cell(row=i, column=11, value="")
+        cell_nuovo.alignment = Alignment(horizontal='center', vertical='center')
+    else:
+        cell_nuovo = ws.cell(row=i, column=11, value="NUOVO")
+        cell_nuovo.alignment = Alignment(horizontal='center', vertical='center')
+
+    if enable_details_page_scraping:
+        cell_apertura = ws.cell(row=i, column=12, value=record["Apertura_Iscrizioni"])
+        cell_apertura.number_format = 'DD/MM/YYYY'
+        cell_apertura.alignment = Alignment(horizontal='center', vertical='center')
+
+        cell_chiusura = ws.cell(row=i, column=13, value=record["Chiusura_Iscrizioni"])
+        cell_chiusura.number_format = 'DD/MM/YYYY'
+        cell_chiusura.alignment = Alignment(horizontal='center', vertical='center')
+
+        if record["Chiusura_Iscrizioni"] < oggi:
+            ws.row_dimensions[i].hidden = True
+
+
+
+
+ws.column_dimensions['A'].width = 60
+ws.column_dimensions['B'].width = 12
+ws.column_dimensions['C'].width = 12
+ws.column_dimensions['D'].width = 12
+ws.column_dimensions['E'].width = 10
+ws.column_dimensions['F'].width = 30
+ws.column_dimensions['G'].width = 10
+ws.column_dimensions['H'].width = 12
+ws.column_dimensions['I'].width = 12
+ws.column_dimensions['J'].width = 12
+ws.column_dimensions['K'].width = 12
+
+if enable_details_page_scraping:
+    ws.column_dimensions['L'].width = 12
+    ws.column_dimensions['M'].width = 12
+
+for cell in ws[1]:
+    cell.font = Font(bold=True)
+    cell.alignment = Alignment(horizontal='center', vertical='center')
+    cell.fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid') # Azzurro chiaro
+
+ws.cell(row=1, column=1).alignment = Alignment(horizontal='left', vertical='center')
+ws.cell(row=1, column=6).alignment = Alignment(horizontal='left', vertical='center')
+
+rosso = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid') # Rosso chiaro
+giallo = PatternFill(start_color='FFEB9C', end_color='FFEB9C', fill_type='solid') # Giallo chiaro
+verde = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid') # Verde chiaro
+fucsia = PatternFill(start_color='9975BB', end_color='9975BB', fill_type='solid')
+
+# 2. Definiamo il range (es: dalla riga 2 alla fine della colonna J)
+range_stato = f'J2:J{ws.max_row}'
+
+# 3. Applichiamo le regole
+ws.conditional_formatting.add(range_stato, CellIsRule(operator='equal', formula=['"PIENO"'], fill=rosso))
+ws.conditional_formatting.add(range_stato, CellIsRule(operator='equal', formula=['"CODA"'], fill=giallo))
+ws.conditional_formatting.add(range_stato, CellIsRule(operator='equal', formula=['"LIBERO"'], fill=verde))
+ws.conditional_formatting.add(f'K2:K{ws.max_row}', CellIsRule(operator='equal', formula=['"NUOVO"'], fill=fucsia))
+
+# 2. Attiviamo il filtro
+ws.auto_filter.ref = ws.dimensions
+ws.freeze_panes = "A2"
+
+if 'regioni_filtro' in globals():
+    ws.auto_filter.add_filter_column(1, regioni_filtro)
+if 'stato_filtro' in globals():
+    ws.auto_filter.add_filter_column(9, stato_filtro)
+
+
+# aggiornamento del filtro
+flt_col = FilterColumn(colId=12) # zero-based index
+c_filters = CustomFilters()
+c_filters.customFilter.append(CustomFilter(operator='greaterThanOrEqual', val=str(to_excel(oggi.replace(hour=0, minute=0, second=0, microsecond=0)))))
+flt_col.customFilters = c_filters
+ws.auto_filter.filterColumn.append(flt_col)
+
+# 5. Salvataggio
+wb.save(file_excel)
+print(f"File {file_excel} creato correttamente.")
+
+if path_excel_old.is_file():
+    wb_old.close()
+    path_excel_old.unlink()
