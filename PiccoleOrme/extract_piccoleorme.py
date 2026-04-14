@@ -19,44 +19,68 @@ from openpyxl.worksheet.filters import (
 
 import os
 
-if os.getenv("CLOUD_RUN") and os.getenv("CLOUD_RUN").lower() == "true":
-    json_path = "https://dariomangoni.github.io/BuonacacciaEvents/piccole_orme.json"
-    print("Running on cloud.")
-else:
-    json_path = "piccole_orme.json"
-    print("Running locally.")
-
-worsheet_title = "PiccoleOrme"
-file_excel = "piccole_orme.xlsx"
-buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=1010101&All=1"
-enable_details_page_scraping = True
-
-# only for filtering; comment to not filter
-regioni_filtro = ["Lombardia", "Piemonte", "Veneto", "EmiRo", "Toscana", "Liguria"]
-stato_filtro = ["LIBERO", "CODA"]
 
 def clean_data(data_raw):
     try:
         return datetime.strptime(data_raw.strip(), "%d/%m/%Y")
     except:
         return None 
-    
 
-# 1. Scaricamento della pagina
+if os.getenv("GITHUB_ACTIONS") and os.getenv("GITHUB_ACTIONS").lower() == "true":
+    json_url = "https://dariomangoni.github.io/BuonacacciaEvents/piccole_orme.json"
+    print("Running on cloud.")
+    cloud_run = True
+else:
+    json_filename = "piccole_orme.json"
+    print("Running locally.")
+    cloud_run = False
+
+worsheet_title = "PiccoleOrme"
+file_excel = "piccole_orme.xlsx"
+buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=1010101&All=1"
+enable_details_page_scraping = True
+
+# only for filtering; comment to NOT filter
+regioni_filtro = ["Lombardia", "Piemonte", "Veneto", "EmiRo", "Toscana", "Liguria"]
+stato_filtro = ["LIBERO", "CODA"]
+
+
+# Scaricamento della pagina
 base_url = "https://buonacaccia.net"
 headers = {'User-Agent': 'Mozilla/5.0'}
 response = requests.get(buonacaccia_events_url, headers=headers)
 soup = BeautifulSoup(response.text, 'html.parser')
 
-# 1. Trova la tabella principale
+# Trova la tabella principale
 table = soup.find("table", {"id": "MainContent_EventsGridView"})
-
-# 2. Trova il tbody (BS lo trova anche se nel codice sorgente è implicito)
 tbody = table.find("tbody", recursive=False)
-
-# 3. Se esiste il tbody, cerca i tr lì dentro, altrimenti cercali nella table
 target = tbody if tbody else table
 rows = target.find_all("tr", recursive=False)
+
+# Check run precedenti
+try:
+    if cloud_run:
+        response_json = requests.get(json_url, headers=headers)
+        if response_json.status_code == 200:
+            print("Previous run data found. Will compare with new data.")
+            record_old = response_json.json()
+        else:
+            print("No previous data found or error fetching it. Will proceed without comparison.")
+            record_old = []
+    else:
+        with open(json_filename, "r", encoding="utf-8") as f:
+            record_old = json.load(f)
+
+except Exception as e:
+    print(f"Error fetching previous data: {e}. Will proceed without comparison.")
+    record_old = []
+
+history_loaded = False
+if isinstance(record_old, dict):
+    titoli_old = {e['Titolo'] for e in record_old.get("eventi", [])}
+    aggiornamento_precedente = record_old.get("aggiornato", "")
+    history_loaded = True
+
 
 data_list = []
 row_count = 0
@@ -119,7 +143,9 @@ for row in rows:
         "Comune": comune,
         "Provincia": provincia,
         "Iscritti": iscritti_val,
-        "Iscritti_MAX": iscritti_max
+        "Iscritti_MAX": iscritti_max,
+        "Stato": "LIBERO" if iscritti_val < iscritti_max else ("CODA" if iscritti_val <= iscritti_max + 5 else "PIENO"),
+        "Nuovo": False if history_loaded and titolo_testo in titoli_old else True
     }
 
     if enable_details_page_scraping:
@@ -131,16 +157,18 @@ for row in rows:
 # --- CREAZIONE DATAFRAME ---
 df = pd.DataFrame(data_list)
 
-# --- EXPORT JSON (Prima di modificare i titoli per Excel) ---
+# --- EXPORT JSON ---
 output_json = {
-    "ultimo_aggiornamento": datetime.now().isoformat(),
+    "aggiornamento_precedente": aggiornamento_precedente if history_loaded else "",
+    "aggiornato": datetime.now().isoformat(),
     "eventi": df.to_dict(orient="records")
 }
+
 def json_serial(obj):
     if isinstance(obj, (datetime)): return obj.strftime('%Y-%m-%d')
     raise TypeError ("Type %s not serializable" % type(obj))
 
-with open(json_path, "w", encoding="utf-8") as f:
+with open(json_filename, "w", encoding="utf-8") as f:
     json.dump(output_json, f, indent=4, default=json_serial, ensure_ascii=False)
 
 # --- PREPARAZIONE EXCEL ---
@@ -158,24 +186,24 @@ ws.append(headers)
 
 oggi = datetime.now()
     
-file_excel_old_exists = False
-path_excel = Path(file_excel)
-path_excel_old = path_excel.with_name(path_excel.stem + "_old" + path_excel.suffix)
-if path_excel.is_file():
-    file_excel_old_exists = True
-    shutil.copy(path_excel, path_excel_old) # Backup del file esistente
-    wb_old = load_workbook(path_excel_old, read_only=True)
-    ws_old = wb_old[worsheet_title]
+# file_excel_old_exists = False
+# path_excel = Path(file_excel)
+# path_excel_old = path_excel.with_name(path_excel.stem + "_old" + path_excel.suffix)
+# if path_excel.is_file():
+#     file_excel_old_exists = True
+#     shutil.copy(path_excel, path_excel_old) # Backup del file esistente
+#     wb_old = load_workbook(path_excel_old, read_only=True)
+#     ws_old = wb_old[worsheet_title]
 
 
-def exists_in_worksheet(ws, value):
-    found = False
-    for row in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
-        if row[0] == value:
-            found = True
-            break
+# def exists_in_worksheet(ws, value):
+#     found = False
+#     for row in ws.iter_rows(min_row=2, min_col=1, max_col=1, values_only=True):
+#         if row[0] == value:
+#             found = True
+#             break
             
-    return found
+#     return found
 
 # 3. Itera sulla lista di record e scrivi le righe
 for i, record in enumerate(data_list, start=2): # Start=2 perché la riga 1 è l'header
@@ -222,11 +250,11 @@ for i, record in enumerate(data_list, start=2): # Start=2 perché la riga 1 è l
         elif record["Iscritti"] > record["Iscritti_MAX"]+5 and "PIENO" not in stato_filtro:
             ws.row_dimensions[i].hidden = True
 
-    if file_excel_old_exists and exists_in_worksheet(ws_old, record["Titolo"]):
-        cell_nuovo = ws.cell(row=i, column=11, value="")
+    if record["Nuovo"]:
+        cell_nuovo = ws.cell(row=i, column=11, value="NUOVO")
         cell_nuovo.alignment = Alignment(horizontal='center', vertical='center')
     else:
-        cell_nuovo = ws.cell(row=i, column=11, value="NUOVO")
+        cell_nuovo = ws.cell(row=i, column=11, value="")
         cell_nuovo.alignment = Alignment(horizontal='center', vertical='center')
 
     if enable_details_page_scraping:
@@ -303,6 +331,6 @@ ws.auto_filter.filterColumn.append(flt_col)
 wb.save(file_excel)
 print(f"File {file_excel} creato correttamente.")
 
-if path_excel_old.is_file():
-    wb_old.close()
-    path_excel_old.unlink()
+# if path_excel_old.is_file():
+#     wb_old.close()
+#     path_excel_old.unlink()

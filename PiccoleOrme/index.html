@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js"></script>
+</head>
+
+<style>
+    #events-table {
+        height: 600px;
+        /* Imposta un'altezza fissa per il test */
+        width: 100%;
+        border: 1px solid #ccc;
+    }
+</style>
+
+<body>
+    <div id="events-table"></div>
+
+    <script>
+        fetch('piccole_orme.json')
+            .then(response => response.json())
+            .then(data => {
+                var table = new Tabulator("#events-table", {
+                    data: data.eventi,
+                    layout: "fitColumns",
+                    // Applichiamo i filtri iniziali
+                    initialHeaderFilter: [
+                        { field: "Regione", value: ["Lombardia", "Piemonte", "Veneto", "EmiRo", "Toscana", "Liguria"] },
+                        { field: "Stato", value: ["LIBERO", "CODA"] },
+                    ],
+                    pagination: "local",
+                    paginationSize: 20,
+                    columns: [
+                        { title: "Titolo", field: "Titolo", headerFilter: "input", formatter: "link", formatterParams: { urlField: "Link", target: "_blank" } },
+                        {
+                            title: "Regione",
+                            field: "Regione",
+                            headerFilter: "list",
+                            headerFilterParams: { valuesLookup: true, multiselect: true },
+                            headerFilterFunc: "in"
+                        },
+                        {
+                            title: "Provincia",
+                            field: "Provincia",
+                            headerFilter: "list",
+                            headerFilterParams: { valuesLookup: true, multiselect: true },
+                            headerFilterFunc: "in"
+                        },
+                        {
+                            title: "Comune",
+                            field: "Comune",
+                            headerFilter: "input"
+                        },
+                        { title: "Partenza", field: "Partenza", headerFilter: "input" },
+                        { title: "Rientro", field: "Rientro", headerFilter: "input" },
+                        {
+                            title: "Stato",
+                            field: "Stato",
+                            headerFilter: "list",
+                            headerFilterParams: { values: ["LIBERO", "CODA", "PIENO"], multiselect: true },
+                            headerFilterFunc: "in",
+                            formatter: function (cell) {
+                                var val = cell.getValue();
+                                if (val == "LIBERO") cell.getElement().style.backgroundColor = "#C6EFCE";
+                                if (val == "CODA") cell.getElement().style.backgroundColor = "#FFEB9C";
+                                if (val == "PIENO") cell.getElement().style.backgroundColor = "#FFC7CE";
+                                return val;
+                            }
+                        },
+                        { title: "Nuovo", field: "Nuovo", formatter: "tickCross" }
+                    ],
+                });
+            });
+    </script>
+</body>
+
+</html>
