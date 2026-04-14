@@ -1,0 +1,45 @@
+name: Update All Reports
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Esegue ogni notte a mezzanotte
+  workflow_dispatch: # Permette l'avvio manuale per test
+
+permissions:
+  contents: write # Serve per fare il push dei JSON se vuoi tenerli nel repo
+  pages: write # Serve per pubblicare su GitHub Pages
+  id-token: write # Necessario per la sicurezza del deployment
+
+jobs:
+  build_and_run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 # Aggiungi altre librerie se servono
+
+      - name: Run Scrapers
+        run: |
+          python PiccoleOrme/extract.py
+          python Competenza/extract.py
+          python Special/extract.py
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Carica l'intero repository (root) come sito da pubblicare
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
