@@ -66,7 +66,7 @@ def main():
     stato_filtro = ["LIBERO", "CODA"]
 
     worsheet_title = tipo_eventi
-    file_excel = f"{tipo_eventi}/{tipo_eventi}.xlsx"
+    file_excel = f"{tipo_eventi}/eventi.xlsx"
     if tipo_eventi == "PiccoleOrme":
         buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=1010101&All=1"
     elif tipo_eventi == "Competenza":
