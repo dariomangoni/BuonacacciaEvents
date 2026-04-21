@@ -93,6 +93,12 @@
     <h2><i class="fas fa-list"></i> Catalogo Eventi</h2>
     <div id="events-table"></div>
 
+    <div>
+        <p>Nota: per i dati aggiornati consultare il sito BuonaCaccia.</p>
+        <p class="text-muted text-center">Aggiornato al: <span id="update-date"></span></p>
+        <p class="text-muted text-center">Confronto con file generato il: <span id="compare-date"></span></p>
+    </div>
+
     <script>
         // Converts YYYY-MM-DD (or similar with hyphens)
         // Accepts either a Tabulator cell component or a
@@ -104,6 +110,19 @@
                 return p[2] + "/" + p[1] + "/" + p[0];
             }
             return val;
+        }
+
+        // Format ISO datetime (e.g. 2026-04-21T16:37:36.567510) to Italian date+time
+        function formatDateTime(iso) {
+            if (!iso) return "";
+            try {
+                const dt = new Date(iso);
+                if (isNaN(dt)) return formatDateCell(iso);
+                const pad = n => String(n).padStart(2, '0');
+                return `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+            } catch (e) {
+                return iso;
+            }
         }
 
         function dateOperatorFilter(headerValue, rowValue, rowData, filterParams) {
@@ -149,6 +168,34 @@
             }
         }
 
+        // Numeric operator filter: supports =, ==, >, >=, <, <= with decimals
+        function numberOperatorFilter(headerValue, rowValue, rowData, filterParams) {
+            if (!headerValue) return true;
+
+            // Accept operators like ==, =, >=, <=, >, < followed by a number (commas or dots allowed)
+            const match = headerValue.match(/^(==|=|>=|<=|>|<)?\s*([0-9.,\s]+)$/);
+            if (!match) return true;
+
+            let operator = match[1] || "=";
+            if (operator === "==") operator = "=";
+
+            // Normalize number: remove spaces, replace comma with dot
+            const rawNum = match[2].replace(/\s+/g, "").replace(/,/, ".");
+            const filterNum = parseFloat(rawNum);
+            const rowNum = parseFloat(String(rowValue).replace(/\s+/g, "").replace(/,/, "."));
+
+            if (isNaN(filterNum) || isNaN(rowNum)) return true;
+
+            switch (operator) {
+                case "=": return rowNum === filterNum;
+                case ">": return rowNum > filterNum;
+                case ">=": return rowNum >= filterNum;
+                case "<": return rowNum < filterNum;
+                case "<=": return rowNum <= filterNum;
+                default: return true;
+            }
+        }
+
         fetch('data.json')
             .then(response => response.json())
             .then(data => {
@@ -160,6 +207,22 @@
                     document.title = `Report ${tipo}`;
                     const h2 = document.querySelector("h2");
                     if (h2) h2.innerHTML = `<i class="fas fa-list"></i> Catalogo Eventi ${tipo}`;
+                }
+
+                const aggiornato = data.aggiornato || "";
+                if (aggiornato) {
+                    const updateDateElem = document.getElementById("update-date");
+                    if (updateDateElem) {
+                        updateDateElem.textContent = formatDateTime(aggiornato);
+                    }
+                }
+
+                const aggiornamento_precedente = data.aggiornamento_precedente || "";
+                if (aggiornamento_precedente) {
+                    const compareDateElem = document.getElementById("compare-date");
+                    if (compareDateElem) {
+                        compareDateElem.textContent = formatDateTime(aggiornamento_precedente);
+                    }
                 }
 
                 let columns_var = [
@@ -216,6 +279,41 @@
                         headerFilter: "input"
                     },
                     {
+                        title: "Quota",
+                        field: "Quota",
+                        hozAlign: "center",
+                        sorter: "number",
+                        formatter: "money",
+                        formatterParams: {
+                            symbol: "€",
+                            symbolAfter: true,
+                            thousand: ".",
+                            decimal: ",",
+                            precision: 2
+                        },
+                        headerFilter: "input",
+                        headerFilterPlaceholder: "Filtra numeri: <=, >=, =, <, >",
+                        headerFilterFunc: numberOperatorFilter
+                    },
+                    {
+                        title: "Iscritti",
+                        field: "Iscritti",
+                        hozAlign: "center",
+                        sorter: "number",
+                        headerFilter: "input",
+                        headerFilterPlaceholder: "Filtra numeri: <=, >=, =, <, >",
+                        headerFilterFunc: numberOperatorFilter
+                    },
+                    {
+                        title: "Max Iscritti",
+                        field: "Iscritti_MAX",
+                        hozAlign: "center",
+                        sorter: "number",
+                        headerFilter: "input",
+                        headerFilterPlaceholder: "Filtra numeri: <=, >=, =, <, >",
+                        headerFilterFunc: numberOperatorFilter
+                    },
+                    {
                         title: "Stato",
                         field: "Stato",
                         hozAlign: "center",
@@ -247,25 +345,29 @@
                 ];
 
                 if (eventi.length > 0 && "Apertura_Iscrizioni" in eventi[0]) {
-                    columns_var.push({ title: "Apertura Iscrizioni", field: "Apertura_Iscrizioni",
+                    columns_var.push({
+                        title: "Apertura Iscrizioni", field: "Apertura_Iscrizioni",
                         hozAlign: "center",
                         sorter: "date",
                         sorterParams: { format: "dd/MM/yyyy" },
                         headerFilter: "input",
                         headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
                         headerFilterFunc: dateOperatorFilter,
-                        formatter: formatDateCell });
+                        formatter: formatDateCell
+                    });
                 }
 
                 if (eventi.length > 0 && "Chiusura_Iscrizioni" in eventi[0]) {
-                    columns_var.push({ title: "Chiusura Iscrizioni", field: "Chiusura_Iscrizioni",
+                    columns_var.push({
+                        title: "Chiusura Iscrizioni", field: "Chiusura_Iscrizioni",
                         hozAlign: "center",
                         sorter: "date",
                         sorterParams: { format: "dd/MM/yyyy" },
                         headerFilter: "input",
                         headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
                         headerFilterFunc: dateOperatorFilter,
-                        formatter: formatDateCell });
+                        formatter: formatDateCell
+                    });
                 }
 
                 var table = new Tabulator("#events-table", {
@@ -295,6 +397,8 @@
             })
             .catch(err => console.error("Errore nel caricamento:", err));
     </script>
+
+
 </body>
 
 </html>
