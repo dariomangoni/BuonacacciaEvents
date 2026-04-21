@@ -51,13 +51,13 @@ def main():
     cartella.mkdir(parents=True, exist_ok=True)
     shutil.copy('index_template.html', cartella / f'index.html')
     
+    json_filename = f"{tipo_eventi}/data.json"
 
     if os.getenv("GITHUB_ACTIONS") and os.getenv("GITHUB_ACTIONS").lower() == "true":
         json_url = f"https://dariomangoni.github.io/BuonacacciaEvents/{tipo_eventi}/data.json"
         print("Running on cloud.")
         cloud_run = True
     else:
-        json_filename = f"{tipo_eventi}/data.json"
         print("Running locally.")
         cloud_run = False
 
