@@ -2,13 +2,12 @@ name: Update All Reports
 
 on:
   schedule:
-    - cron: "0 0 * * *" # Esegue ogni notte a mezzanotte
+    - cron: "0 12 * * 0"
   workflow_dispatch: # Permette l'avvio manuale per test
 
 permissions:
-  contents: write # Serve per fare il push dei JSON se vuoi tenerli nel repo
-  pages: write # Serve per pubblicare su GitHub Pages
-  id-token: write # Necessario per la sicurezza del deployment
+  pages: write
+  id-token: write
 
 jobs:
   build_and_run:
@@ -26,13 +25,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 # Aggiungi altre librerie se servono
+          pip install openpyxl requests beautifulsoup4 pandas
 
       - name: Run Scrapers
         run: |
-          python PiccoleOrme/extract.py
-          python Competenza/extract.py
-          python Special/extract.py
+          python extract_events.py PiccoleOrme
+          python extract_events.py Competenza
+          python extract_events.py Special
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

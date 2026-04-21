@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report eventi</title>
+
+    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
+    <script src="https://moment.github.io/luxon/global/luxon.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f9;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #003366;
+            font-weight: 600;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #003366;
+            padding-bottom: 10px;
+        }
+
+        #events-table {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 50px;
+        }
+
+        .tabulator {
+            border: none !important;
+        }
+
+        .tabulator-header {
+            background-color: #003366 !important;
+            color: white !important;
+            font-weight: 600 !important;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+
+        .tabulator-col {
+            background-color: #003366 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        /* Stile Righe */
+        .tabulator-row {
+            border-bottom: 1px solid #eee !important;
+            transition: background-color 0.2s;
+        }
+
+        .tabulator-row:hover {
+            background-color: #f0f4f8 !important;
+        }
+
+        .event-link {
+            color: #0056b3;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .tabulator-cell {
+            padding: 4px 8px !important;
+            font-size: 0.9em;
+        }
+
+        .event-link:hover {
+            text-decoration: underline;
+        }
+
+        .tabulator-cell a {
+            color: #0056b3;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .tabulator-cell a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h2><i class="fas fa-list"></i> Catalogo Eventi</h2>
+    <div id="events-table"></div>
+
+    <script>
+        // Converts YYYY-MM-DD (or similar with hyphens)
+        // Accepts either a Tabulator cell component or a
+        // plain string value.
+        function formatDateCell(cellOrValue) {
+            var val = (cellOrValue && typeof cellOrValue.getValue === "function") ? cellOrValue.getValue() : cellOrValue;
+            if (val && typeof val === "string" && val.includes("-")) {
+                var p = val.split("-");
+                return p[2] + "/" + p[1] + "/" + p[0];
+            }
+            return val;
+        }
+
+        function dateOperatorFilter(headerValue, rowValue, rowData, filterParams) {
+            if (!headerValue) return true;
+
+            // Regex robusta per separare operatore e data
+            const match = headerValue.match(/^(=|>=|<=|>|<)?\s*(.*)$/);
+            if (!match) return true;
+
+            const operator = match[1] || "=";
+            const filterDateStr = match[2].trim();
+
+            // Se non c'è ancora una data valida inserita, non filtrare
+            if (filterDateStr.length < 10) return true;
+
+            function parseToNum(str) {
+                if (!str) return NaN;
+                // Rimuove trattini o slash
+                const clean = str.replace(/[\/\-]/g, "");
+                // Se ISO (YYYYMMDD) - Lunghezza 8, inizia con 20...
+                if (clean.length === 8 && (clean.startsWith("20") || clean.startsWith("19"))) {
+                    return parseInt(clean);
+                }
+                // Se IT (DDMMYYYY)
+                if (clean.length === 8) {
+                    return parseInt(clean.substring(4, 8) + clean.substring(2, 4) + clean.substring(0, 2));
+                }
+                return NaN;
+            }
+
+            const rowNum = parseToNum(rowValue);
+            const filterNum = parseToNum(filterDateStr);
+
+            if (isNaN(filterNum) || isNaN(rowNum)) return true;
+
+            switch (operator) {
+                case "=": return rowNum === filterNum;
+                case ">": return rowNum > filterNum;
+                case ">=": return rowNum >= filterNum;
+                case "<": return rowNum < filterNum;
+                case "<=": return rowNum <= filterNum;
+                default: return true;
+            }
+        }
+
+        fetch('data.json')
+            .then(response => response.json())
+            .then(data => {
+                const eventi = data.eventi;
+
+                // Use `tipo_eventi` from the JSON to update page title and header
+                const tipo = data.tipo_eventi || data.tipo || "";
+                if (tipo) {
+                    document.title = `Report ${tipo}`;
+                    const h2 = document.querySelector("h2");
+                    if (h2) h2.innerHTML = `<i class="fas fa-list"></i> Catalogo Eventi ${tipo}`;
+                }
+
+                let columns_var = [
+                    {
+                        title: "Evento",
+                        field: "Titolo",
+                        widthGrow: 3,
+                        headerFilter: "input",
+                        formatter: "link",
+                        formatterParams: {
+                            urlField: "Link",
+                            target: "_blank",
+                            labelField: "Titolo"
+                        }
+                    },
+                    {
+                        title: "Regione",
+                        field: "Regione",
+                        headerFilter: "list",
+                        headerFilterParams: { valuesLookup: true, multiselect: true },
+                        headerFilterFunc: "in"
+                    },
+                    {
+                        title: "Provincia",
+                        field: "Provincia",
+                        hozAlign: "center",
+                        headerFilter: "list",
+                        headerFilterParams: { valuesLookup: true, multiselect: true },
+                        headerFilterFunc: "in"
+                    },
+                    {
+                        title: "Comune",
+                        field: "Comune",
+                        headerFilter: "list",
+                        headerFilterParams: { valuesLookup: true, multiselect: true },
+                        headerFilterFunc: "in"
+                    },
+                    {
+                        title: "Partenza",
+                        field: "Partenza",
+                        hozAlign: "center",
+                        sorter: "date",
+                        sorterParams: { format: "dd/MM/yyyy" },
+                        headerFilter: "input",
+                        headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
+                        headerFilterFunc: dateOperatorFilter,
+                        formatter: formatDateCell
+                    },
+                    {
+                        title: "Rientro",
+                        field: "Rientro",
+                        hozAlign: "center",
+                        formatter: formatDateCell,
+                        headerFilter: "input"
+                    },
+                    {
+                        title: "Stato",
+                        field: "Stato",
+                        hozAlign: "center",
+                        headerFilter: "list",
+                        headerFilterParams: { values: ["LIBERO", "CODA", "PIENO"], multiselect: true },
+                        headerFilterFunc: "in",
+                        formatter: function (cell) {
+                            var val = cell.getValue();
+                            var el = cell.getElement();
+                            el.style.fontWeight = "bold";
+                            if (val == "LIBERO") el.style.color = "#28a745"; // Verde moderno
+                            if (val == "CODA") el.style.color = "#fd7e14";   // Arancione
+                            if (val == "PIENO") el.style.color = "#dc3545";  // Rosso
+                            return val;
+                        }
+                    },
+                    {
+                        title: "Nuovo",
+                        field: "Nuovo",
+                        hozAlign: "center",
+                        formatter: "tickCross",
+                        formatterParams: { crossElement: false } // Mostra solo la spunta se nuovo
+                    }
+                ];
+
+                initialHeaderFilter_var = [
+                    { field: "Regione", value: ["Lombardia", "Piemonte", "Veneto"] },
+                    { field: "Stato", value: ["LIBERO", "CODA"] }
+                ];
+
+                if (eventi.length > 0 && "Apertura_Iscrizioni" in eventi[0]) {
+                    columns_var.push({ title: "Apertura Iscrizioni", field: "Apertura_Iscrizioni",
+                        hozAlign: "center",
+                        sorter: "date",
+                        sorterParams: { format: "dd/MM/yyyy" },
+                        headerFilter: "input",
+                        headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
+                        headerFilterFunc: dateOperatorFilter,
+                        formatter: formatDateCell });
+                }
+
+                if (eventi.length > 0 && "Chiusura_Iscrizioni" in eventi[0]) {
+                    columns_var.push({ title: "Chiusura Iscrizioni", field: "Chiusura_Iscrizioni",
+                        hozAlign: "center",
+                        sorter: "date",
+                        sorterParams: { format: "dd/MM/yyyy" },
+                        headerFilter: "input",
+                        headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
+                        headerFilterFunc: dateOperatorFilter,
+                        formatter: formatDateCell });
+                }
+
+                var table = new Tabulator("#events-table", {
+                    data: eventi,
+                    layout: "fitColumns",
+                    responsiveLayout: "collapse",
+                    // pagination: "local",
+                    // paginationSize: 15,
+                    height: false, // Adatta l'altezza al contenuto
+                    placeholder: "Nessun evento trovato con i filtri selezionati",
+
+                    initialHeaderFilter: initialHeaderFilter_var,
+
+                    columns: columns_var,
+                });
+
+                table.on("tableBuilt", function () {
+                    // Genera data odierna in formato DD/MM/YYYY
+                    const d = new Date();
+                    const oggiIT = d.getDate().toString().padStart(2, '0') + "/" +
+                        (d.getMonth() + 1).toString().padStart(2, '0') + "/" +
+                        d.getFullYear();
+
+                    table.setHeaderFilterValue("Partenza", ">=" + oggiIT);
+                    table.setHeaderFilterValue("Chiusura_Iscrizioni", ">=" + oggiIT);
+                });
+            })
+            .catch(err => console.error("Errore nel caricamento:", err));
+    </script>
+</body>
+
+</html>
