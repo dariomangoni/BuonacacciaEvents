@@ -61,19 +61,23 @@ def main():
         print("Running locally.")
         cloud_run = False
 
+    # only for filtering; comment to NOT filter
+    regioni_filtro = ["Lombardia", "Piemonte", "Veneto", "EmiRo", "Toscana", "Liguria"]
+    stato_filtro = ["LIBERO", "CODA"]
+
     worsheet_title = tipo_eventi
     file_excel = f"{tipo_eventi}/{tipo_eventi}.xlsx"
     if tipo_eventi == "PiccoleOrme":
         buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=1010101&All=1"
     elif tipo_eventi == "Competenza":
+        # la regione dei campetti di competenza viene estratta dal titolo nel quale è riportata "Emilia Romagna" per intero
+        regioni_filtro = ["Lombardia", "Piemonte", "Veneto", "Emilia Romagna", "Toscana", "Liguria"]
         buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=2010104&All=1"
     elif tipo_eventi == "Special":
         buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=2010101&All=1"
     enable_details_page_scraping = True
 
-    # only for filtering; comment to NOT filter
-    regioni_filtro = ["Lombardia", "Piemonte", "Veneto", "EmiRo", "Toscana", "Liguria"]
-    stato_filtro = ["LIBERO", "CODA"]
+
 
 
     # Scaricamento della pagina
