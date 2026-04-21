@@ -63,7 +63,12 @@ def main():
 
     worsheet_title = tipo_eventi
     file_excel = f"{tipo_eventi}/{tipo_eventi}.xlsx"
-    buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=1010101&All=1"
+    if tipo_eventi == "PiccoleOrme":
+        buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=1010101&All=1"
+    elif tipo_eventi == "Competenza":
+        buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=2010104&All=1"
+    elif tipo_eventi == "Special":
+        buonacaccia_events_url = "https://buonacaccia.net/Events.aspx?RID=&CID=2010101&All=1"
     enable_details_page_scraping = True
 
     # only for filtering; comment to NOT filter
