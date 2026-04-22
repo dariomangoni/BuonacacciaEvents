@@ -203,6 +203,7 @@ def main():
         "tipo_eventi": tipo_eventi,
         "aggiornato": datetime.now().isoformat(),
         "aggiornamento_precedente": aggiornamento_precedente if history_loaded else "",
+        "buonacaccia_url": buonacaccia_events_url,
         "eventi": df.to_dict(orient="records")
     }
 

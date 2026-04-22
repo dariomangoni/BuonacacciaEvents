@@ -94,7 +94,8 @@
     <div id="events-table"></div>
 
     <div>
-        <p>Nota: per i dati aggiornati consultare il sito BuonaCaccia.</p>
+        <p>Nota: per i dati aggiornati consultare il sito <a id="buonacaccia-url" href="https://buonacaccia.net/Events.aspx"
+                target="_blank">BuonaCaccia</a>.</p>
         <p class="text-muted text-center">Aggiornato al: <span id="update-date"></span></p>
         <p class="text-muted text-center">Confronto con file generato il: <span id="compare-date"></span></p>
         <p class="text-muted text-center"><a href="eventi.xlsx" target="_blank">Download Excel (.XLSX)</a></p>
@@ -226,6 +227,14 @@
                     }
                 }
 
+                const buonacaccia_url = data.buonacaccia_url || "";
+                if (buonacaccia_url) {
+                    const buonacacciaElem = document.getElementById("buonacaccia-url");
+                    if (buonacacciaElem) {
+                        buonacacciaElem.href = buonacaccia_url;
+                    }
+                }
+
                 let columns_var = [
                     {
                         title: "Evento",
@@ -266,9 +275,8 @@
                         field: "Partenza",
                         hozAlign: "center",
                         sorter: "date",
-                        sorterParams: { format: "dd/MM/yyyy" },
+                        sorterParams: { format: "yyyy-MM-dd" },
                         headerFilter: "input",
-                        headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
                         headerFilterFunc: dateOperatorFilter,
                         formatter: formatDateCell
                     },
@@ -276,8 +284,11 @@
                         title: "Rientro",
                         field: "Rientro",
                         hozAlign: "center",
-                        formatter: formatDateCell,
-                        headerFilter: "input"
+                        sorter: "date",
+                        sorterParams: { format: "yyyy-MM-dd" },
+                        headerFilter: "input",
+                        headerFilterFunc: dateOperatorFilter,
+                        formatter: formatDateCell
                     },
                     {
                         title: "Quota",
@@ -293,7 +304,6 @@
                             precision: 2
                         },
                         headerFilter: "input",
-                        headerFilterPlaceholder: "Filtra numeri: <=, >=, =, <, >",
                         headerFilterFunc: numberOperatorFilter
                     },
                     {
@@ -302,7 +312,6 @@
                         hozAlign: "center",
                         sorter: "number",
                         headerFilter: "input",
-                        headerFilterPlaceholder: "Filtra numeri: <=, >=, =, <, >",
                         headerFilterFunc: numberOperatorFilter
                     },
                     {
@@ -311,7 +320,6 @@
                         hozAlign: "center",
                         sorter: "number",
                         headerFilter: "input",
-                        headerFilterPlaceholder: "Filtra numeri: <=, >=, =, <, >",
                         headerFilterFunc: numberOperatorFilter
                     },
                     {
@@ -347,12 +355,12 @@
 
                 if (eventi.length > 0 && "Apertura_Iscrizioni" in eventi[0]) {
                     columns_var.push({
-                        title: "Apertura Iscrizioni", field: "Apertura_Iscrizioni",
+                        title: "Apertura Iscrizioni",
+                        field: "Apertura_Iscrizioni",
                         hozAlign: "center",
                         sorter: "date",
-                        sorterParams: { format: "dd/MM/yyyy" },
+                        sorterParams: { format: "yyyy-MM-dd" },
                         headerFilter: "input",
-                        headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
                         headerFilterFunc: dateOperatorFilter,
                         formatter: formatDateCell
                     });
@@ -360,12 +368,12 @@
 
                 if (eventi.length > 0 && "Chiusura_Iscrizioni" in eventi[0]) {
                     columns_var.push({
-                        title: "Chiusura Iscrizioni", field: "Chiusura_Iscrizioni",
+                        title: "Chiusura Iscrizioni",
+                        field: "Chiusura_Iscrizioni",
                         hozAlign: "center",
                         sorter: "date",
-                        sorterParams: { format: "dd/MM/yyyy" },
+                        sorterParams: { format: "yyyy-MM-dd" },
                         headerFilter: "input",
-                        headerFilterPlaceholder: "Filtra per data [dd/mm/aaaa]",
                         headerFilterFunc: dateOperatorFilter,
                         formatter: formatDateCell
                     });
