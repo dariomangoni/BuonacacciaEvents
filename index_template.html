@@ -71,6 +71,7 @@
         .tabulator-cell {
             padding: 4px 8px !important;
             font-size: 0.9em;
+            white-space: nowrap !important;
         }
 
         .event-link:hover {
@@ -86,6 +87,30 @@
         .tabulator-cell a:hover {
             text-decoration: underline;
         }
+
+
+        @media (max-width: 600px) {
+            body {
+                padding: 5px;
+                /* Riduciamo il margine esterno */
+            }
+
+            .tabulator-cell {
+                padding: 2px 4px !important;
+                /* Celle più compatte */
+                font-size: 0.8em;
+            }
+
+            .tabulator-header .tabulator-col-title {
+                font-size: 0.75em;
+            }
+
+            /* Nascondi i filtri header su mobile se occupano troppo spazio */
+            /* (Opzionale: l'utente potrà comunque vedere i dati) */
+            .tabulator-header-filter {
+                display: none;
+            }
+        }
     </style>
 </head>
 
@@ -94,8 +119,8 @@
     <div id="events-table"></div>
 
     <div>
-        <p>Nota: per i dati aggiornati consultare il sito <a id="buonacaccia-url" href="https://buonacaccia.net/Events.aspx"
-                target="_blank">BuonaCaccia</a>.</p>
+        <p>Nota: per i dati aggiornati consultare il sito <a id="buonacaccia-url"
+                href="https://buonacaccia.net/Events.aspx" target="_blank">BuonaCaccia</a>.</p>
         <p class="text-muted text-center">Aggiornato al: <span id="update-date"></span></p>
         <p class="text-muted text-center">Confronto con file generato il: <span id="compare-date"></span></p>
         <p class="text-muted text-center"><a href="eventi.xlsx" target="_blank">Download Excel (.XLSX)</a></p>
@@ -240,6 +265,7 @@
                         title: "Evento",
                         field: "Titolo",
                         widthGrow: 3,
+                        minWidth: 200,
                         headerFilter: "input",
                         formatter: "link",
                         formatterParams: {
@@ -381,8 +407,8 @@
 
                 var table = new Tabulator("#events-table", {
                     data: eventi,
-                    layout: "fitColumns",
-                    responsiveLayout: "collapse",
+                    layout: "fitData",
+                    // responsiveLayout: "collapse",
                     // pagination: "local",
                     // paginationSize: 15,
                     height: false, // Adatta l'altezza al contenuto
